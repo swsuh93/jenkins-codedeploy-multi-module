@@ -1,12 +1,12 @@
-package com.jojoldu.aws.jenkins.codedeploy;
+package com.jojoldu.aws.jenkins;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class JenkinsCodedeployMultiModuleApplication {
+public class MemberCoreApplicationTest {
 
     public static void main(String[] args) {
-        SpringApplication.run(JenkinsCodedeployMultiModuleApplication.class, args);
+        SpringApplication.run(MemberCoreApplicationTest.class, args);
     }
 }

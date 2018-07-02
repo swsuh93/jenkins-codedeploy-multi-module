@@ -1,4 +1,4 @@
-package com.jojoldu.aws.jenkins.codedeploy;
+package com.jojoldu.aws.jenkins.batch;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -7,10 +7,10 @@ import org.springframework.test.context.junit4.SpringRunner;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest
-public class JenkinsCodedeployMultiModuleApplicationTests {
+public class MemberBatchApplicationTests {
 
-    @Test
-    public void contextLoads() {
-    }
+	@Test
+	public void contextLoads() {
+	}
 
 }

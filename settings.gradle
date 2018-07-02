@@ -1,1 +1,3 @@
 rootProject.name = 'jenkins-codedeploy-multi-module'
+
+include 'member-core', 'member-batch'
