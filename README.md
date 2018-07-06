@@ -6,6 +6,22 @@
 
 ## 0. 들어가며
 
+> 여기서는 [Gradle Multi Module](http://jojoldu.tistory.com/123)로 구성된 프로젝트를 기준으로 합니다.  
+
+Spring Batch의 Trigger를 관리하는 방법은 크게 3가지가 있습니다.
+
+* Linux의 crontab
+* Spring Quartz
+* Jenkins
+
+보통 Linux의 crontab과 Spring Quartz를 많이들 사용하시는데요.  
+Jenkins가 생각보다 Spring Batch 관리용으로 유용하고 효율적입니다.  
+
+> 현재 제가 속해있는 팀에서도 적극적으로 Jenkins를 Batch 관리로 사용중인데요.  
+기회가 되면 이 부분도 한번 정리하겠습니다 :)
+
+Jenkins로 Spring Batch를 관리하기 위해서 지켜주셔야할 것은 **배포용 Jenkins와 Batch용 Jenkins를 분리하는 것**입니다.  
+여기선 이 2개가 분리되어있다는 가정하에 시작합니다.  
 
 ## 1. AWS 환경 설정
 
@@ -27,6 +43,15 @@
 
 ![iam5](./images/iam5.png)
 
+추가로 **Code Deploy용 IAM Role**도 생성합니다.
+
+![iam6](./images/iam6.png)
+
+![iam7](./images/iam7.png)
+
+![iam8](./images/iam8.png)
+
+
 ### S3 Bucket 생성
 
 배포할 zip 파일을 관리할 S3 Bucket도 생성합니다.
@@ -43,12 +68,15 @@
 
 ![s4](./images/s4.png)
 
+
+### Code Deploy 생성
+
 ## 2. 배포 Jenkins 환경 설정
 
-배포 Jenkins는 Github과 연동이 필요합니다.  
-
+배포 Jenkins에서 Github에 올라간 코드를 가져올 수 있도록 Github과 연동이 필요합니다.  
 > Jenkins와 Github 연동은 [이전에 작성된 포스팅](http://jojoldu.tistory.com/291)를 참고해서 진행하시는것을 추천드립니다.
 
+**연동이 되셨으면** 배포 Job을 생성하겠습니다.
 
 ![deploy1](./images/deploy1.png)
 
@@ -56,7 +84,13 @@
 
 ![deploy3](./images/deploy3.png)
 
-![deploy4](./images/deploy4.png)
+소스코드 관리에서는 배포할 프로젝트의 Github 주소를 등록합니다.
+
+![deploy3](./images/deploy4.png)
+
+배포 스크립트 내용은 좀 길어서 아래 코드를 그대로 복사해주세요.
+
+![deploy4](./images/deploy5.png)
 
 ```bash
 DEPLOY_DIR_NAME=code-deploy-${PROJECT_NAME}
@@ -89,6 +123,17 @@ echo "	> 생성된 디렉토리 삭제"
 cd ..
 rm -rf ${DEPLOY_DIR_NAME}
 ```
+
+* ```./gradlew :${PROJECT_NAME}:clean :${PROJECT_NAME}:build```
+    * 멀티 모듈 프로젝트이기 때문에 지정한 프로젝트를 Build 하도록 합니다.
+* 배포.zip 생성
+    * 하위 프로젝트의 ```code-deploy``` 디렉토리 안에 있는 yml, sh파일과 build된 jar파일을 하나의 zip으로 묶습니다.
+* AWS S3 업로드
+    * S3에 배포.zip 파일을 올립니다.
+* AWS CodeDeploy 배포
+    * 업로드한 S3 파일로 Code Deploy 배포를 진행합니다.
+
+자 이렇게 하면 배포 Jenkins의 설정은 끝이 납니다.
 
 ## 3. 프로젝트 설정
 
