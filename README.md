@@ -25,7 +25,7 @@ Jenkins로 Spring Batch를 관리하기 위해서 지켜주셔야할 것은 **�
 
 ## 1. AWS 환경 설정
 
-**배포용 Jenkins**와 **Batch용 Jenkins**로 Jenkins는 **총 2대**가 필요합니다. 
+**배포용 Jenkins**와 **Batch용 Jenkins**로 Jenkins와 서버는 **총 2대**가 필요합니다. 
 
 > 아직 구축이 안되있으시다면, 이전에 작성한 [EC2에 Jenkins 설치하기](http://jojoldu.tistory.com/290) 을 참고해서 설치하시면 됩니다.  
  
@@ -225,17 +225,18 @@ public class SampleBatchConfigurationTest {
 
 샘플 배치가 잘 수행되는 것을 알 수 있습니다!  
 프로젝트의 배치 코드는 완성 되었습니다.  
-이제 배포를 위한 설정파일들을 추가하겠습니다.
+이제 배포를 위한 설정 파일들을 추가하겠습니다.
 
 ### 2-1. 배포 설정 파일 추가
 
+제일 먼저 member-batch 프로젝트 안에 code-deploy 디렉토리를 생성합니다.  
+그리고 아래 그림처럼 2개의 파일을 생성합니다.  
+
+![batch4](./images/batch4.png)
+
 Code Deploy는 배포를 어떻게 진행할지를 ```appspec.yml```로 결정합니다.  
-여기서 jar의 권한이나 실행시킬 스크립트 등을 지정할 수 있습니다.  
+여기서 **jar의 권한이나 실행시킬 스크립트 등을 지정**할 수 있습니다.  
   
-자 그럼 바로 시작하겠습니다.  
-먼저 member-batch 프로젝트 안에 code-deploy 디렉토리를 생성합니다.  
-
-
 **appspec.yml**
 
 ```yaml
@@ -258,6 +259,20 @@ hooks:
       runas: ec2-user
 ```
 
+
+* ```files.destination: /home/jenkins/member-batch/deploy```
+    * Code Deploy로 배포하게 되면 배포되는 서버의 ```/opt/codedeploy-agent/deployment-root/어플리케이션ID/배포그룹 ID``` 에 저장됩니다
+    * 배포될 서버의 ```/home/jenkins/member-batch/deploy```로 배포 파일들을 모두 옮긴다는 의미입니다.
+* ```permissions```
+    * 모든 실행 권한을 ```jenkins:jenkins```로 하겠다는 의미입니다.
+
+* ```hooks.ApplicationStart```
+    * **배포 파일을 모두 옮긴 후**, 지정한 파일 (```deploy.sh```)를 실행합니다.
+    * 좀 더 다양한 Event Cycle을 원하신다면 [공식 가이드](https://docs.aws.amazon.com/ko_kr/codedeploy/latest/userguide/reference-appspec-file-structure-hooks.html)를 참고하세요.
+
+appspec.yml 생성이 끝나셨으면, 다음으로는 deploy.sh를 생성하겠습니다.  
+appspec.yml과 마찬가지로 member-batch/code-deploy에 생성합니다.  
+  
 **deploy.sh**
 
 ```bash
@@ -281,13 +296,51 @@ echo "  > sudo ln -s -f ${JAR_BOX_PATH}${ORIGIN_JAR_NAME} ${TARGET_PATH}"
 sudo ln -s -f ${JAR_BOX_PATH}${ORIGIN_JAR_NAME} ${TARGET_PATH}
 ```
 
+* 배포 파일들 중, jar파일을 찾아 jar를 모아두는 디렉토리 (```JAR_BOX_PATH```)로 복사
+* 복사된 jar 파일의 권한을 ```jenkins:jenkins```로 변경
+* 심볼릭 링크로 application.jar에 배포된 jar 파일 연결
+
+자 이제 프로젝트 설정까지 끝이 났습니다!  
+잘 되는지 Code Deploy 테스트를 한번 수행해보겠습니다!
+
 ## 3. Code Deploy 테스트
 
-젠킨스 유저로 교체
+Code Deploy를 테스트하기 앞서 deploy.sh에 작성된 디렉토리들을 미리 생성하겠습니다.
+
+### 3-1. Batch Jenkins 디렉토리 생성
+
+Batch 젠킨스가 설치된 EC2로 접속합니다.  
+젠킨스는 Spring Batch Jar를 실행할때 사용자가 jenkins인채로 실행하기 때문에 모든 파일과 디렉토리를 jenkins 사용자를 기준으로 합니다.  
+(ec2-user가 아닙니다.)  
+  
+일단 home에 jenkins를 추가하겠습니다.
+
+![dir1](./images/dir1.png)
 
 ```bash
-sudo -u jenkins bash
+cd /home
+sudo mkdir jenkins
 ```
+
+그리고 하위 디렉토리를 생성합니다.
+
+![dir2](./images/dir2.png)
+
+```bash
+sudo mkdir /home/jenkins/member-batch
+sudo mkdir /home/jenkins/member-batch/deploy
+sudo mkdir /home/jenkins/member-batch/jar
+```
+
+그리고 이들의 권한을 모두 jenkins로 전환합니다.
+
+![dir3](./images/dir3.png)
+
+```bash
+sudo chown -R jenkins:jenkins /home/jenkins
+```
+
+### 3-2. Code Deploy 테스트
 
 ## 4. 배포 Jenkins 환경 설정
 
@@ -305,7 +358,7 @@ sudo -u jenkins bash
 
 ![deploy3](./images/deploy3.png)
 
-* 여기서는 member-batch 모듈만 있어서 member-batch 만 등록했지만, member-api, member-admin 등 여러 모듈이 있다면 하나씩 다 등록하시면 셀렉트 박스로 쉽게 선택 가능합니다.
+* 여기서는 member-batch 모듈만 있어서 member-batch 만 등록했지만, member-api, member-admin 등 여러 모듈이 있다면 다 등록하시면 됩니다.
 
 
 소스코드 관리에서는 배포할 프로젝트의 Github 주소를 등록합니다.
@@ -363,4 +416,4 @@ rm -rf ${DEPLOY_DIR_NAME}
 
 
 
-## 5. 배치용 Jenkins 실행
+## 5. 배포 및 배치 실행
