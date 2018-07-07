@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 DEPLOY_DIR_NAME=code-deploy-${PROJECT_NAME}
-APP_NAME='dwlee-member'
+APP_NAME='dwlee-member-deploy'
 BUCKET='dwlee-member-deploy'
 ZIP_NAME=${PROJECT_NAME}-${GIT_COMMIT}-${BUILD_TAG}.zip
 
