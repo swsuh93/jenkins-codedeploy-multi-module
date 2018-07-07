@@ -225,9 +225,11 @@ public class SampleBatchConfigurationTest {
 
 샘플 배치가 잘 수행되는 것을 알 수 있습니다!  
 프로젝트의 배치 코드는 완성 되었습니다.  
-이제 배포를 위한 설정 파일들을 추가하겠습니다.
+이제 Code Deploy와 연동을 진행해보겠습니다.
 
-### 2-1. 배포 설정 파일 추가
+## 3. Code Deploy 연동
+
+### 3-1. 배포 설정 파일 추가
 
 제일 먼저 member-batch 프로젝트 안에 code-deploy 디렉토리를 생성합니다.  
 그리고 아래 그림처럼 2개의 파일을 생성합니다.  
@@ -303,13 +305,38 @@ sudo ln -s -f ${JAR_BOX_PATH}${ORIGIN_JAR_NAME} ${TARGET_PATH}
 자 이제 프로젝트 설정까지 끝이 났습니다!  
 잘 되는지 Code Deploy 테스트를 한번 수행해보겠습니다!
 
-## 3. Code Deploy 테스트
+### 3-2. Batch Jenkins 서버 설정
 
-Code Deploy를 테스트하기 앞서 deploy.sh에 작성된 디렉토리들을 미리 생성하겠습니다.
+먼저 Batch Jenkins 서버에 Code Deploy agent를 설치하겠습니다.  
+  
 
-### 3-1. Batch Jenkins 디렉토리 생성
+필요한 패키지 업데이트를 먼저 하고
 
-Batch 젠킨스가 설치된 EC2로 접속합니다.  
+```bash
+sudo yum update
+sudo yum install ruby
+sudo yum install wget
+```
+
+agent를 설치합니다.
+
+```bash
+cd /home/ec2-user
+wget https://aws-codedeploy-ap-northeast-2.s3.amazonaws.com/latest/install
+chmod +x ./install
+sudo ./install auto
+```
+
+설치 및 실행이 잘 되었는지 확인해봅니다.
+
+![agent1](./images/agent1.png)
+
+```bash
+sudo service codedeploy-agent status
+```
+
+agent가 설치되었으니, **deploy.sh에 작성된 디렉토리들을 미리 생성**하겠습니다.
+
 젠킨스는 Spring Batch Jar를 실행할때 사용자가 jenkins인채로 실행하기 때문에 모든 파일과 디렉토리를 jenkins 사용자를 기준으로 합니다.  
 (ec2-user가 아닙니다.)  
   
@@ -340,10 +367,91 @@ sudo mkdir /home/jenkins/member-batch/jar
 sudo chown -R jenkins:jenkins /home/jenkins
 ```
 
-### 3-2. Code Deploy 테스트
+생성된 모든 디렉토리의 사용자:그룹 권한이 ```jenkins:jenkins```로 변경되었습니다.  
+EC2의 작업이 끝났으니 다시 프로젝트로 돌아가겠습니다.
+
+### 3-3. Code Deploy 테스트
+
+Code Deploy가 소스코드를 가져오는 방법은 크게 2가지가 있습니다.  
+
+* Github의 특정 커밋을 기준으로 가져오기
+* S3에 올라간 zip 파일을 가져오기
+
+Github에서 코드를 가져오는 방식은 지금과 같이 **member-batch만 빌드해서 가져오기가 불편**합니다.  
+그래서 S3에 zip 파일을 올려서 테스트 해보겠습니다.
+
+> 이 과정은 이후 배포 Jenkins에서 자동화 되어 진행될 예정입니다.
+
+먼저 Root 프로젝트의 ```gradlew```를 이용하여 member-batch만 build 합니다.
+
+![localtest1](./images/localtest1.png)
+
+```bash
+./gradlew :member-batch:clean :member-batch:build
+```
+
+그리고 디렉토리 하나를 생성하여 **Code Deploy 배포에 필요한 모든 파일을 복사**합니다.
+
+![localtest2](./images/localtest2.png)
+
+```bash
+mkdir -p code-deploy-member-batch
+cp member-batch/code-deploy/*.yml code-deploy-member-batch 
+cp member-batch/code-deploy/*.sh code-deploy-member-batch
+cp member-batch/build/libs/*.jar code-deploy-member-batch
+```
+
+복사된 디렉토리를 통째로 zip 파일로 만듭니다.
+
+![localtest3](./images/localtest3.png)
+
+```bash
+zip -r code-deploy-member-batch *
+```
+
+이렇게 생성된 zip 파일을 1-3 에서 만든 S3 Bucket에 업로드 합니다.
+
+![localtest4](./images/localtest4.png)
+
+![localtest5](./images/localtest5.png)
+
+![localtest6](./images/localtest6.png)
+
+업로드 된 파일의 상세 정보 페이지로 가보시면 아래와 같은 링크가 나옵니다.
+
+![localtest7](./images/localtest7.png)
+
+링크를 복사하시고, Code Deploy 페이지로 이동합니다.
+
+![localtest8](./images/localtest8.png)
+
+![localtest9](./images/localtest9.png)
+
+![localtest10](./images/localtest10.png)
+
+Code Deploy 상태가 성공으로 변하면 배포가 성공한 것입니다.
+
+![localtest11](./images/localtest11.png)
+
+자 Batch 서버에서도 한번 확인해보겠습니다.  
+
+![localtest12](./images/localtest12.png)
+
+심볼링 링크로 application.jar와 member-batch.jar가 아주 잘 연결되어있음을 확인할 수 있습니다!  
+  
+그럼 마지막으로 이 배치 파일을 실행해보겠습니다.
+
+![localtest13](./images/localtest13.png)
+
+```bash
+sudo -H -u jenkins java -jar $(readlink /home/jenkins/member-batch/application.jar) --job.name=sampleBatch version=test
+```
+
+**Code Deploy로 배포된 jar 배치 수행**까지 테스트 되었습니다!  
 
 ## 4. 배포 Jenkins 환경 설정
 
+여기서는 **Batch가 아닌 배포 Jenkins** 페이지로 이동합니다.  
 배포 Jenkins에서 Github에 올라간 코드를 가져오려면 Github과 연동이 필요합니다.  
 
 > Jenkins와 Github 연동은 [이전에 작성된 포스팅](http://jojoldu.tistory.com/291)를 참고해서 진행하시는것을 추천드립니다.
